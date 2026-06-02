@@ -1,0 +1,373 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User Models
+model User {
+  id                    String      @id @default(cuid())
+  email                 String      @unique
+  password              String?
+  firstName             String
+  lastName              String
+  phoneNumber           String?
+  profileImage          String?
+  businessName          String?
+  businessCategory      String?
+  gstNumber             String?
+  panNumber             String?
+  bankAccount           String?
+  bankName              String?
+  accountHolderName     String?
+  ifscCode              String?
+  
+  // Address
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String?
+  postalCode            String?
+  country               String?
+  
+  // Marketplaces
+  meeshoId              String?
+  amazonId              String?
+  flipkartId            String?
+  shopifyStoreUrl       String?
+  
+  // Settings
+  language              String      @default("en")
+  timezone              String?
+  twoFactorEnabled      Boolean     @default(false)
+  emailVerified         Boolean     @default(false)
+  phoneVerified         Boolean     @default(false)
+  
+  // Status
+  isActive              Boolean     @default(true)
+  isBanned              Boolean     @default(false)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  deletedAt             DateTime?
+  
+  // Relations
+  subscription          Subscription?
+  products              Product[]
+  orders                Order[]
+  invoices              Invoice[]
+  aiGenerations         AiGeneration[]
+  payments              Payment[]
+  analyticsData         Analytics[]
+  shipments             Shipment[]
+  auditLogs             AuditLog[]
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+// Subscription Models
+model Subscription {
+  id                    String      @id @default(cuid())
+  userId                String      @unique
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  planType              String      @default("free") // free, starter, pro, business
+  status                String      @default("active") // active, cancelled, expired, suspended
+  
+  monthlyLimit          Int         // AI generations limit per month
+  usedLimit             Int         @default(0)
+  
+  startDate             DateTime    @default(now())
+  endDate               DateTime?
+  renewalDate           DateTime?
+  
+  razorpaySubscriptionId String?
+  razorpayCustomerId    String?
+  
+  autoRenew             Boolean     @default(true)
+  notificationsSent     Int         @default(0)
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Product Models
+model Product {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title                 String
+  seoTitle              String?
+  description           String?
+  metaDescription       String?
+  shortDescription      String?
+  
+  category              String
+  subCategory           String?
+  tags                  String[]
+  keywords              String[]
+  
+  price                 Float
+  costPrice             Float?
+  mrp                   Float?
+  discount              Float?
+  
+  sku                   String?
+  hsn                   String?
+  gst                   Float?
+  
+  quantity              Int         @default(0)
+  reserved              Int         @default(0)
+  
+  images                String[]
+  thumbnails            String[]
+  whiteBackgroundImage  String?
+  
+  status                String      @default("draft") // draft, active, inactive
+  marketplace           String[]    // meesho, amazon, flipkart
+  bestMarketplace       String?
+  
+  bulletPoints          String[]
+  features              Json?
+  specifications        Json?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  // Relations
+  orders                Order[]
+  aiGenerations         AiGeneration[]
+  analytics             Analytics[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Order Models
+model Order {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId             String
+  product               Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  orderNumber           String      @unique
+  quantity              Int
+  price                 Float
+  totalAmount           Float
+  
+  customerName          String
+  customerEmail         String?
+  customerPhone         String?
+  
+  shippingAddress       String
+  billingAddress        String?
+  
+  status                String      @default("pending") // pending, processing, shipped, delivered, cancelled, returned
+  paymentStatus         String      @default("pending") // pending, paid, failed, refunded
+  
+  marketplace           String      // meesho, amazon, flipkart
+  marketplaceOrderId    String?
+  
+  shipmentId            String?
+  shipment              Shipment?   @relation(fields: [shipmentId], references: [id])
+  
+  invoice               Invoice?
+  profit                Float?
+  profitMargin          Float?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Invoice Models
+model Invoice {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  invoiceNumber         String      @unique
+  invoiceDate           DateTime    @default(now())
+  dueDate               DateTime?
+  
+  orderIds              String[]
+  
+  subtotal              Float
+  gstAmount             Float
+  totalAmount           Float
+  
+  status                String      @default("draft") // draft, generated, sent, paid, overdue
+  
+  pdfUrl                String?
+  sentAt                DateTime?
+  paidAt                DateTime?
+  
+  notes                 String?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// AI Generation Models
+model AiGeneration {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId             String?
+  product               Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  
+  type                  String      // title, description, seoTitle, metaDescription, bulletPoints, hashtags, instagramCaption, whatsappText, facebookAd
+  language              String      @default("en")
+  
+  prompt                String
+  output                String
+  
+  variations            Json[]      // Multiple AI suggestions
+  selectedVariation     Int         @default(0)
+  
+  marketplace           String?     // meesho, amazon, flipkart
+  
+  tokensUsed            Int         @default(0)
+  costInUsd             Float       @default(0)
+  
+  model                 String      @default("gpt-4") // gpt-4, gemini
+  
+  status                String      @default("completed") // pending, processing, completed, failed
+  error                 String?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([type])
+}
+
+// Payment Models
+model Payment {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  razorpayPaymentId     String      @unique
+  razorpayOrderId       String?
+  razorpaySubscriptionId String?
+  
+  amount                Float
+  currency              String      @default("INR")
+  
+  method                String      // card, upi, netbanking, wallet, emi
+  status                String      // created, authorized, captured, failed, refunded
+  
+  description           String?
+  notes                 Json?
+  
+  receipt               String?
+  invoiceId             String?
+  
+  refundId              String?
+  refundAmount          Float?
+  refundedAt            DateTime?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Shipment Models
+model Shipment {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  courier               String      // delhivery, xpressbees, shadowfax, valmo, bluedart
+  trackingNumber        String      @unique
+  
+  status                String      @default("pending") // pending, picked, in_transit, out_for_delivery, delivered, failed, returned
+  
+  weight                Float?
+  dimensions            Json?
+  
+  pickupDate            DateTime?
+  deliveryDate          DateTime?
+  estimatedDeliveryDate DateTime?
+  
+  orders                Order[]
+  
+  trackingData          Json?
+  lastUpdate            DateTime?
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([trackingNumber])
+}
+
+// Analytics Models
+model Analytics {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId             String?
+  product               Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  
+  views                 Int         @default(0)
+  clicks                Int         @default(0)
+  conversions           Int         @default(0)
+  revenue               Float       @default(0)
+  
+  conversionRate        Float       @default(0)
+  ctr                   Float       @default(0) // Click Through Rate
+  avgOrderValue         Float       @default(0)
+  
+  date                  DateTime
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([date])
+}
+
+// Audit Log Models
+model AuditLog {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action                String      // login, logout, create, update, delete
+  entity                String      // user, product, order, payment
+  entityId              String?
+  
+  changes               Json?       // What changed
+  ipAddress             String?
+  userAgent             String?
+  
+  createdAt             DateTime    @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
